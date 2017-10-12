@@ -1,12 +1,28 @@
-#include <sys/types.h>
-#include <dirent.h>
 #include <Python.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#define BIGDIR_BUF_SIZE 32768
+#define BIGDIR_NREAD_INIT -2
+#define BIGDIR_NREAD_EOF -3
+
+struct linux_dirent {
+    unsigned long d_ino;
+    unsigned long d_off;
+    unsigned short d_reclen;
+    char d_name[];
+};
 
 typedef struct {
     PyObject_HEAD
-    int count;
-    int current;
-    struct dirent **namelist;
+    int fd;
+    int pos;
+    int nread;
+    char buf[BIGDIR_BUF_SIZE];
+    struct linux_dirent *ent;
 } bigdir_Iterator;
 
 PyObject* bigdir_Iterator_iter(PyObject *self)
@@ -18,12 +34,29 @@ PyObject* bigdir_Iterator_iter(PyObject *self)
 PyObject* bigdir_Iterator_next(PyObject *self)
 {
     bigdir_Iterator *p = (bigdir_Iterator*)self;
-    if (p->current < p->count) {
-        return PyString_FromString(p->namelist[p->current++]->d_name);
-    } else {
-	PyErr_SetNone(PyExc_StopIteration);
-	return NULL;
+
+    /* Check if we are in an EOF state */
+    if (p->nread == BIGDIR_NREAD_EOF) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
     }
+
+    /* Check if it is time to read some more */
+    if (p->nread == BIGDIR_NREAD_INIT || p->nread > 0 && p->pos >= p->nread) {
+        p->pos = 0;
+        p->nread = syscall(SYS_getdents, p->fd, p->buf, sizeof(p->buf));
+        // TODO if p->nread==-1...
+        if (p->nread == 0) {
+            p->nread = BIGDIR_NREAD_EOF;
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
+    }
+
+    /* We read stuff and there's still more to go */
+    p->ent = (struct linux_dirent *)(p->buf + p->pos);
+    p->pos += p->ent->d_reclen;
+    return PyString_FromString(p->ent->d_name);
 }
 
 static PyTypeObject bigdir_IteratorType = {
@@ -63,26 +96,20 @@ static PyObject *
 bigdir_scan(PyObject *self, PyObject *args)
 {
     const char *path;
-    int count;
     bigdir_Iterator *p;
 
     if (!PyArg_ParseTuple(args, "s", &path)) {
         return NULL;
     }
 
-    struct dirent **namelist;
-    count = scandir(path, &namelist, NULL, NULL);
-
     p = PyObject_New(bigdir_Iterator, &bigdir_IteratorType);
     if (!p) return NULL;
     if (!PyObject_Init((PyObject *)p, &bigdir_IteratorType)) {
-	Py_DECREF(p);
-	return NULL;
+        Py_DECREF(p);
+        return NULL;
     }
-    p->current = 0;
-    p->count = count;
-    p->namelist = namelist;
-
+    p->fd = open(path, O_RDONLY | O_DIRECTORY);
+    p->nread = BIGDIR_NREAD_INIT;
     return (PyObject*)p;
 }
 
