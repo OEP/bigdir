@@ -25,13 +25,22 @@ typedef struct {
     struct linux_dirent *ent;
 } bigdir_Iterator;
 
-PyObject* bigdir_Iterator_iter(PyObject *self)
+static void
+xclose(int fd) {
+    if(close(fd) == -1) {
+        PyErr_SetFromErrno(PyExc_IOError);
+    }
+}
+
+static PyObject*
+bigdir_Iterator_iter(PyObject *self)
 {
     Py_INCREF(self);
     return self;
 }
 
-PyObject* bigdir_Iterator_next(PyObject *self)
+static PyObject*
+bigdir_Iterator_next(PyObject *self)
 {
     bigdir_Iterator *p = (bigdir_Iterator*)self;
 
@@ -42,13 +51,20 @@ PyObject* bigdir_Iterator_next(PyObject *self)
     }
 
     /* Check if it is time to read some more */
-    if (p->nread == BIGDIR_NREAD_INIT || p->nread > 0 && p->pos >= p->nread) {
+    if (p->nread == BIGDIR_NREAD_INIT || (p->nread > 0 && p->pos >= p->nread)) {
         p->pos = 0;
         p->nread = syscall(SYS_getdents, p->fd, p->buf, sizeof(p->buf));
-        // TODO if p->nread==-1...
-        if (p->nread == 0) {
+
+        /* Handle error case */
+        if (p->nread == -1) {
+            PyErr_SetFromErrno(PyExc_IOError);
+            xclose(p->fd);
+            return NULL;
+        }
+        else if (p->nread == 0) {
             p->nread = BIGDIR_NREAD_EOF;
             PyErr_SetNone(PyExc_StopIteration);
+            xclose(p->fd);
             return NULL;
         }
     }
@@ -109,6 +125,10 @@ bigdir_scan(PyObject *self, PyObject *args)
         return NULL;
     }
     p->fd = open(path, O_RDONLY | O_DIRECTORY);
+    if(p->fd == -1) {
+        PyErr_SetFromErrno(PyExc_IOError);
+        return NULL;
+    }
     p->nread = BIGDIR_NREAD_INIT;
     return (PyObject*)p;
 }
