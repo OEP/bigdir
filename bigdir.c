@@ -26,9 +26,14 @@ typedef struct {
 } bigdir_Iterator;
 
 static void
-xclose(int fd) {
-    if(close(fd) == -1) {
+xclose(int* fd) {
+    if(*fd == -1) {
+        return;
+    }
+    if(close(*fd) == -1) {
         PyErr_SetFromErrno(PyExc_IOError);
+    } else {
+        *fd = -1;
     }
 }
 
@@ -37,6 +42,13 @@ bigdir_Iterator_iter(PyObject *self)
 {
     Py_INCREF(self);
     return self;
+}
+
+void
+bigdir_Iterator_dealloc(PyObject *self)
+{
+    bigdir_Iterator *p = (bigdir_Iterator*)self;
+    xclose(&p->fd);
 }
 
 static PyObject*
@@ -58,13 +70,13 @@ bigdir_Iterator_next(PyObject *self)
         /* Handle error case */
         if (p->nread == -1) {
             PyErr_SetFromErrno(PyExc_IOError);
-            xclose(p->fd);
+            xclose(&p->fd);
             return NULL;
         }
         else if (p->nread == 0) {
             p->nread = BIGDIR_NREAD_EOF;
             PyErr_SetNone(PyExc_StopIteration);
-            xclose(p->fd);
+            xclose(&p->fd);
             return NULL;
         }
     }
@@ -81,7 +93,7 @@ static PyTypeObject bigdir_IteratorType = {
     "bigdir._Iterator",        /*tp_name*/
     sizeof(bigdir_Iterator),   /*tp_basicsize*/
     0,                         /*tp_itemsize*/
-    0,                         /*tp_dealloc*/
+    bigdir_Iterator_dealloc,   /*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
     0,                         /*tp_setattr*/
