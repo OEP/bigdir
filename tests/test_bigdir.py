@@ -13,10 +13,17 @@ def test_scan_too_many_args():
         bigdir.scan(None, None)
 
 
-def test_scan_tmpdir(tmpdir):
+def test_scan_empty(tmpdir):
     result = bigdir.scan(str(tmpdir))
-    for item in result:
-        assert item in ('.', '..')
+    assert list(result) == []
+
+
+def test_single_file(tmpdir):
+    f = tmpdir.join("test.txt")
+    f.write("Hello.")
+
+    result = bigdir.scan(str(tmpdir))
+    assert list(result) == ["test.txt"]
 
 
 def test_scan_error_open(tmpdir):

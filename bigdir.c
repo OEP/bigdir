@@ -48,16 +48,23 @@ bigdir_Iterator_next(PyObject *self)
     }
 
     /* Check if it is time to read some more */
-    rc = readdir_r(p->dirp, &p->ent, &entp);
-    if(rc > 0) {
-        PyErr_SetString(PyExc_IOError, strerror(rc));
-        xclose(&p->dirp);
+    do {
+        rc = readdir_r(p->dirp, &p->ent, &entp);
+        if(rc > 0) {
+            PyErr_SetString(PyExc_IOError, strerror(rc));
+            xclose(&p->dirp);
+            return NULL;
+        }
+        if(entp == NULL) {
+            xclose(&p->dirp);
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
     }
-    if(entp == NULL) {
-        xclose(&p->dirp);
-        PyErr_SetNone(PyExc_StopIteration);
-        return NULL;
-    }
+    while (
+        !strncmp(entp->d_name, ".", 1) ||
+        !strncmp(entp->d_name, "..", 2)
+    );
 
     /* We read stuff and there's still more to go */
     return PyString_FromString(entp->d_name);
