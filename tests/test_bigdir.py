@@ -29,11 +29,11 @@ def test_scan_error_open(tmpdir):
     assert e.value.errno == errno.ENOTDIR
 
 
-def test_scan_error_getdents(tmpdir):
-    # getdents() call fails in the middle of iteration
+def test_scan_error_readdir(tmpdir):
+    # readdir() file is removed
     root = tmpdir.join('foo').mkdir()
     iterator = bigdir.scan(str(root))
     root.remove()
-    with pytest.raises(IOError) as e:
-        list(iterator)
-    assert e.value.errno == errno.ENOENT
+    # NOTE POSIX.1 says that this case should be treated like an EOF
+    # glibc implements this, and that's what we're following
+    assert list(iterator) == []
