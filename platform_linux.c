@@ -6,8 +6,6 @@
 #include <fcntl.h>
 
 #define BIGDIR_BUF_SIZE (5 * 1024 * 1024)
-#define BIGDIR_NREAD_INIT -2
-#define BIGDIR_NREAD_EOF -3
 
 struct linux_dirent {
     unsigned long d_ino;
@@ -32,21 +30,26 @@ int bigdir_iterator_open(struct bigdir_iterator* it, const char* path) {
     if(it->_fd == -1) {
         return -1;
     }
-    it->_nread = BIGDIR_NREAD_INIT;
+    /* Setting these magic values tricks next() into performing a read */
+    it->_pos = 1;
+    it->_nread = 1;
     return 0;
 }
 
 void bigdir_iterator_dealloc(struct bigdir_iterator* it) {
+    if(it->_fd < 0) {
+        return;
+    }
     (void)close(it->_fd);
 }
 
 int bigdir_iterator_next(struct bigdir_iterator* it) {
-    if (it->_nread == BIGDIR_NREAD_INIT || (it->_nread > 0 && it->_pos >= it->_nread)) {
+    if (it->_nread > 0 && it->_pos >= it->_nread) {
         it->_pos = 0;
         it->_nread = syscall(SYS_getdents, it->_fd, it->_buf, sizeof(it->_buf));
 
-        /* This follows what glibc does in the case of error or in EOF
-            * case, which is a POSIX.1 requirement */
+        /* This follows what glibc does in the case of error or in EOF case,
+         * which is a POSIX.1 requirement */
         if (it->_nread <= 0) {
             it->bd_eof = 1;
             bigdir_iterator_dealloc(it);
@@ -57,4 +60,5 @@ int bigdir_iterator_next(struct bigdir_iterator* it) {
     it->_ent = (struct linux_dirent *)(it->_buf + it->_pos);
     it->_pos += it->_ent->d_reclen;
     it->bd_name = it->_ent->d_name;
+    return 0;
 }
