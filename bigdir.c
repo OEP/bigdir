@@ -1,5 +1,4 @@
 #include <Python.h>
-//#include "bigdir.h"
 
 #ifdef __linux__
 #include "platform_linux.c"
