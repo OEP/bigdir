@@ -1,22 +1,39 @@
 #include <Python.h>
-#include <sys/types.h>
 #include <dirent.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#define BIGDIR_BUF_SIZE 32768
+#define BIGDIR_NREAD_INIT -2
+#define BIGDIR_NREAD_EOF -3
+
+struct linux_dirent {
+    unsigned long d_ino;
+    unsigned long d_off;
+    unsigned short d_reclen;
+    char d_name[];
+};
 
 typedef struct {
     PyObject_HEAD
-    DIR* dirp;
-    struct dirent ent;
+    int fd;
+    int pos;
+    int nread;
+    char buf[BIGDIR_BUF_SIZE];
+    struct linux_dirent *ent;
 } bigdir_Iterator;
 
 static void
-xclose(DIR** dir) {
-    if(*dir == NULL) {
+xclose(int* fd) {
+    if(*fd == -1) {
         return;
     }
-    if(closedir(*dir) == -1) {
+    if(close(*fd) == -1) {
         PyErr_SetFromErrno(PyExc_IOError);
     } else {
-        *dir = NULL;
+        *fd = -1;
     }
 }
 
@@ -31,43 +48,45 @@ void
 bigdir_Iterator_dealloc(PyObject *self)
 {
     bigdir_Iterator *p = (bigdir_Iterator*)self;
-    xclose(&p->dirp);
+    xclose(&p->fd);
 }
 
 static PyObject*
 bigdir_Iterator_next(PyObject *self)
 {
     bigdir_Iterator *p = (bigdir_Iterator*)self;
-    struct dirent *entp;
-    int rc;
 
     /* Check if we are in an EOF state */
-    if (p->dirp == NULL) {
+    if (p->nread == BIGDIR_NREAD_EOF) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
 
-    /* Check if it is time to read some more */
     do {
-        rc = readdir_r(p->dirp, &p->ent, &entp);
-        if(rc > 0) {
-            PyErr_SetString(PyExc_IOError, strerror(rc));
-            xclose(&p->dirp);
-            return NULL;
+        /* Check if it is time to read some more */
+        if (p->nread == BIGDIR_NREAD_INIT || (p->nread > 0 && p->pos >= p->nread)) {
+            p->pos = 0;
+            p->nread = syscall(SYS_getdents, p->fd, p->buf, sizeof(p->buf));
+
+            /* This follows what glibc does in the case of error or in EOF
+             * case, which is a POSIX.1 requirement */
+            if (p->nread <= 0) {
+                p->nread = BIGDIR_NREAD_EOF;
+                PyErr_SetNone(PyExc_StopIteration);
+                xclose(&p->fd);
+                return NULL;
+            }
         }
-        if(entp == NULL) {
-            xclose(&p->dirp);
-            PyErr_SetNone(PyExc_StopIteration);
-            return NULL;
-        }
+
+        p->ent = (struct linux_dirent *)(p->buf + p->pos);
+        p->pos += p->ent->d_reclen;
     }
     while (
-        !strncmp(entp->d_name, ".", 1) ||
-        !strncmp(entp->d_name, "..", 2)
+        !strncmp(p->ent->d_name, ".", 1) ||
+        !strncmp(p->ent->d_name, "..", 2)
     );
 
-    /* We read stuff and there's still more to go */
-    return PyString_FromString(entp->d_name);
+    return PyString_FromString(p->ent->d_name);
 }
 
 static PyTypeObject bigdir_IteratorType = {
@@ -119,11 +138,12 @@ bigdir_scan(PyObject *self, PyObject *args)
         Py_DECREF(p);
         return NULL;
     }
-    p->dirp = opendir(path);
-    if(p->dirp == NULL) {
+    p->fd = open(path, O_RDONLY | O_DIRECTORY);
+    if(p->fd == -1) {
         PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     }
+    p->nread = BIGDIR_NREAD_INIT;
     return (PyObject*)p;
 }
 
