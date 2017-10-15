@@ -29,15 +29,14 @@ int bigdir_iterator_next(struct bigdir_iterator* it) {
     errno = 0;
     struct dirent *ent = readdir(it->_dir);
 
-    /* POSIX.1 says we should treat a vanished directory as a normal EOF */
-    if(errno == ENOENT || !ent) {
+    if(errno) {
+        return 1;
+    }
+
+    if(!ent) {
         it->bd_eof = 1;
         bigdir_iterator_dealloc(it); 
         return 0;
-    }
-
-    if(errno) {
-        return 1;
     }
 
     it->bd_name = ent->d_name;
