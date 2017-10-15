@@ -1,101 +1,72 @@
 #include <Python.h>
-#include <dirent.h>
-#include <sys/types.h>
-#include <sys/syscall.h>
-#include <unistd.h>
-#include <fcntl.h>
+//#include "bigdir.h"
 
-#define BIGDIR_BUF_SIZE 32768
-#define BIGDIR_NREAD_INIT -2
-#define BIGDIR_NREAD_EOF -3
-
-struct linux_dirent {
-    unsigned long d_ino;
-    unsigned long d_off;
-    unsigned short d_reclen;
-    char d_name[];
-};
+#ifdef __linux__
+#include "platform_linux.c"
+#elif defined(__APPLE__) || defined(unix) || defined(__unix__) || defined(__unix)
+#include "platform_unix.c"
+#else
+#error Unsupported platform
+#endif
 
 typedef struct {
     PyObject_HEAD
-    int fd;
-    int pos;
-    int nread;
-    char buf[BIGDIR_BUF_SIZE];
-    struct linux_dirent *ent;
-} bigdir_Iterator;
-
-static void
-xclose(int* fd) {
-    if(*fd == -1) {
-        return;
-    }
-    if(close(*fd) == -1) {
-        PyErr_SetFromErrno(PyExc_IOError);
-    } else {
-        *fd = -1;
-    }
-}
+    struct bigdir_iterator it;
+} bigdir_PyIterator;
 
 static PyObject*
-bigdir_Iterator_iter(PyObject *self)
+bigdir_PyIterator_iter(PyObject *self)
 {
     Py_INCREF(self);
     return self;
 }
 
 void
-bigdir_Iterator_dealloc(PyObject *self)
+bigdir_PyIterator_dealloc(PyObject *self)
 {
-    bigdir_Iterator *p = (bigdir_Iterator*)self;
-    xclose(&p->fd);
+    bigdir_PyIterator *p = (bigdir_PyIterator*)self;
+    bigdir_iterator_dealloc(&p->it);
 }
 
 static PyObject*
-bigdir_Iterator_next(PyObject *self)
+bigdir_PyIterator_next(PyObject *self)
 {
-    bigdir_Iterator *p = (bigdir_Iterator*)self;
+    bigdir_PyIterator *p = (bigdir_PyIterator*)self;
 
-    /* Check if we are in an EOF state */
-    if (p->nread == BIGDIR_NREAD_EOF) {
+    /* Check that we didn't start on en EOF */
+    if (p->it.bd_eof) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
 
     do {
-        /* Check if it is time to read some more */
-        if (p->nread == BIGDIR_NREAD_INIT || (p->nread > 0 && p->pos >= p->nread)) {
-            p->pos = 0;
-            p->nread = syscall(SYS_getdents, p->fd, p->buf, sizeof(p->buf));
-
-            /* This follows what glibc does in the case of error or in EOF
-             * case, which is a POSIX.1 requirement */
-            if (p->nread <= 0) {
-                p->nread = BIGDIR_NREAD_EOF;
-                PyErr_SetNone(PyExc_StopIteration);
-                xclose(&p->fd);
-                return NULL;
-            }
+        if(bigdir_iterator_next(&p->it)) {
+            PyErr_SetFromErrno(PyExc_IOError);
+            return NULL;
         }
-
-        p->ent = (struct linux_dirent *)(p->buf + p->pos);
-        p->pos += p->ent->d_reclen;
     }
     while (
-        !strncmp(p->ent->d_name, ".", 1) ||
-        !strncmp(p->ent->d_name, "..", 2)
+        !p->it.bd_eof &&
+        (!strncmp(p->it.bd_name, ".", 1) ||
+         !strncmp(p->it.bd_name, "..", 2))
     );
 
-    return PyString_FromString(p->ent->d_name);
+    /* Check that we didn't end on en EOF */
+    if (p->it.bd_eof) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+
+    return PyString_FromString(p->it.bd_name);
 }
 
-static PyTypeObject bigdir_IteratorType = {
+static PyTypeObject bigdir_PyIteratorType = {
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
     "bigdir._Iterator",        /*tp_name*/
-    sizeof(bigdir_Iterator),   /*tp_basicsize*/
+    sizeof(bigdir_PyIterator),   /*tp_basicsize*/
     0,                         /*tp_itemsize*/
-    bigdir_Iterator_dealloc,   /*tp_dealloc*/
+    bigdir_PyIterator_dealloc,   /*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
     0,                         /*tp_setattr*/
@@ -118,32 +89,32 @@ static PyTypeObject bigdir_IteratorType = {
     0,  /* tp_clear */
     0,  /* tp_richcompare */
     0,  /* tp_weaklistoffset */
-    bigdir_Iterator_iter,  /* tp_iter: __iter__() method */
-    bigdir_Iterator_next  /* tp_iternext: next() method */
+    bigdir_PyIterator_iter,  /* tp_iter: __iter__() method */
+    bigdir_PyIterator_next  /* tp_iternext: next() method */
 };
 
 static PyObject *
 bigdir_scan(PyObject *self, PyObject *args)
 {
     const char *path;
-    bigdir_Iterator *p;
+    bigdir_PyIterator *p;
 
     if (!PyArg_ParseTuple(args, "s", &path)) {
         return NULL;
     }
 
-    p = PyObject_New(bigdir_Iterator, &bigdir_IteratorType);
+    p = PyObject_New(bigdir_PyIterator, &bigdir_PyIteratorType);
     if (!p) return NULL;
-    if (!PyObject_Init((PyObject *)p, &bigdir_IteratorType)) {
+    if (!PyObject_Init((PyObject *)p, &bigdir_PyIteratorType)) {
         Py_DECREF(p);
         return NULL;
     }
-    p->fd = open(path, O_RDONLY | O_DIRECTORY);
-    if(p->fd == -1) {
+    p->it.bd_eof = 0;
+    if(bigdir_iterator_open(&p->it, path)) {
+        Py_DECREF(p);
         PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     }
-    p->nread = BIGDIR_NREAD_INIT;
     return (PyObject*)p;
 }
 
