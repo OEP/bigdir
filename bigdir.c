@@ -24,6 +24,41 @@
 #error Unsupported platform
 #endif
 
+const char* bigdir_doc =
+    "Read very large directories easily\n"
+    "\n"
+    "bigdir is a drop in replacement for os.listdir() which handles large\n"
+    "directories more gracefully. It differs from scandir() in that it does\n"
+    "not return file attribute information and can be fast for very large\n"
+    "directories on Linux systems which rely on glibc's readdir()\n"
+    "implementation.\n"
+    "\n"
+    "Synopsis\n"
+    "--------\n"
+    "\n"
+    "Use bigdir.scan() in place of os.listdir() on directories which may be\n"
+    "very large:\n"
+    "\n"
+    "    import bigdir\n"
+    "    for path in bigdir.scan('/tmp'):\n"
+    "        print(path)\n"
+    "\n"
+    "Use bigdir.IMPLEMENTATION to determine which implementation of bigdir you\n"
+    "are using. It is either \"linux\" or \"unix\". The \"linux\" implementation\n"
+    "avoids calling readdir(), opting for the lower-level getdents() system call\n"
+    "which is will not buffer the entire directory into memory before returning\n"
+    "the first result. This usually means more responsive scripts when the\n"
+    "number of files are in the millions. The \"unix\" implementation does not\n"
+    "provide any special benefit, and is only present so you can write somewhat\n"
+    "portable scripts with bigdir:\n"
+    "\n"
+    "    >>> import bigdir\n"
+    "    >>> bigdir.IMPLEMENTATION\n"
+    "    \"linux\"\n"
+    "\n"
+;
+
+
 typedef struct {
     PyObject_HEAD
     struct bigdir_iterator it;
@@ -141,7 +176,7 @@ static PyMethodDef bigdir_methods[] = {
 PyMODINIT_FUNC
 initbigdir(void)
 {
-    PyObject* module = Py_InitModule("bigdir", bigdir_methods);
+    PyObject* module = Py_InitModule3("bigdir", bigdir_methods, bigdir_doc);
     (void)PyObject_SetAttr(module,
         PyString_FromString("IMPLEMENTATION"),
         PyString_FromString(BIGDIR_IMPLEMENTATION));

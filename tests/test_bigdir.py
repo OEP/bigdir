@@ -59,3 +59,7 @@ def test_implementation_unix():
 @pytest.mark.skipif(not USE_LINUX, reason='Linux implementation only')
 def test_implementation_linux():
     assert bigdir.IMPLEMENTATION == "linux"
+
+
+def test_doc():
+    assert bigdir.__doc__
