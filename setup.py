@@ -7,6 +7,6 @@ ext_modules = [
 setup(
     name='bigdir',
     version='0.1.0',
-    description='Demo package!',
+    description='bigdir lets you read really big directories',
     ext_modules=ext_modules,
 )
