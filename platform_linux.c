@@ -15,6 +15,7 @@
 #include <fcntl.h>
 
 #define BIGDIR_BUF_SIZE (5 * 1024 * 1024)
+#define BIGDIR_IMPLEMENTATION ("linux")
 
 struct linux_dirent {
     unsigned long d_ino;

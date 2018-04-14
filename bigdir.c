@@ -141,5 +141,8 @@ static PyMethodDef bigdir_methods[] = {
 PyMODINIT_FUNC
 initbigdir(void)
 {
-    (void) Py_InitModule("bigdir", bigdir_methods);
+    PyObject* module = Py_InitModule("bigdir", bigdir_methods);
+    (void)PyObject_SetAttr(module,
+        PyString_FromString("IMPLEMENTATION"),
+        PyString_FromString(BIGDIR_IMPLEMENTATION));
 }

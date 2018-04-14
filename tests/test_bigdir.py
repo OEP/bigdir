@@ -1,6 +1,11 @@
-import pytest
 import bigdir
 import errno
+import pytest
+import sys
+
+
+USE_LINUX = sys.platform == 'linux2'
+USE_UNIX = not USE_LINUX
 
 
 def test_scan_noarg():
@@ -44,3 +49,13 @@ def test_scan_error_readdir(tmpdir):
     # NOTE POSIX.1 says that this case should be treated like an EOF
     # glibc implements this, and that's what we're following
     assert list(iterator) == []
+
+
+@pytest.mark.skipif(not USE_UNIX, reason='Unix implementation only')
+def test_implementation_unix():
+    assert bigdir.IMPLEMENTATION == "unix"
+
+
+@pytest.mark.skipif(not USE_LINUX, reason='Linux implementation only')
+def test_implementation_linux():
+    assert bigdir.IMPLEMENTATION == "linux"

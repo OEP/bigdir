@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <stdio.h>
 
+#define BIGDIR_IMPLEMENTATION ("unix")
+
 struct bigdir_iterator {
     char bd_eof;
     char *bd_name;
