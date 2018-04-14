@@ -1,13 +1,8 @@
-import argparse
 import os
 import functools
-import tempfile
-import contextlib
-import shutil
 import time
 import uuid
 
-import bigdir
 import click
 
 
@@ -23,6 +18,12 @@ except ImportError:
     scandir = None
 
 
+try:
+    import bigdir
+except ImportError:
+    bigdir = None
+
+
 DEFAULT_COUNT = 100
 
 
@@ -35,6 +36,7 @@ def generate_fixture(path, count):
 
 
 all_benchmarks = []
+
 
 class Benchmark(object):
 
@@ -59,30 +61,45 @@ def listdir_all(path):
     for p in os.listdir(path):
         pass
 
+
 @benchmark
 def listdir_1(path):
     for p in os.listdir(path):
         break
 
-@benchmark
+
+@benchmark(skip=not bigdir)
 def bigdir_all(path):
     for p in bigdir.scan(path):
         pass
 
-@benchmark
+
+@benchmark(skip=not bigdir)
 def bigdir_1(path):
     for p in bigdir.scan(path):
         break
+
+
+@benchmark(skip=not bigdir)
+def bigdir_0(path):
+    bigdir.scan(path)
+
 
 @benchmark(skip=not scandir)
 def scandir_all(path):
     for p in scandir.scandir(path):
         pass
 
+
 @benchmark(skip=not scandir)
 def scandir_1(path):
     for p in scandir.scandir(path):
         break
+
+
+@benchmark(skip=not scandir)
+def scandir_0(path):
+    scandir.scandir(path)
 
 
 @click.command()
@@ -93,7 +110,6 @@ def main(path, count):
         click.echo('Fixture exists -- skipping.')
     else:
         generate_fixture(path, count)
-
 
     for b in all_benchmarks:
         click.secho("{}... ".format(b.name), bold=True, nl=False)
