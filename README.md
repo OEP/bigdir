@@ -6,9 +6,11 @@ A Python extension which lets you read really big directories.
 Example
 -------
 
->>> import bigdir
->>> for path in bigdir.scan('/tmp'):
->>>     print(path)
+```
+import bigdir
+for path in bigdir.scan('/tmp'):
+    print(path)
+```
 
 Description
 -----------
@@ -25,7 +27,7 @@ In Python, you might experience this in a call to `os.listdir()` or
 returns.
 
 This extension is based on the idea from
-[lowmem-tools][https://github.com/ScottDuckworth/lowmem-tools] which provides
+[lowmem-tools](https://github.com/ScottDuckworth/lowmem-tools) which provides
 alternative implementations of `rm` and `ls` Unix commands.
 
 Support
@@ -47,7 +49,7 @@ of lines of code away.
 Testing
 -------
 
-You should be able to use [`tox`][https://tox.readthedocs.io/] to run the unit tests.
+You should be able to use [`tox`](https://tox.readthedocs.io/) to run the unit tests.
 
 Benchmarking
 ------------
