@@ -1,3 +1,12 @@
+/**
+ * Linux bigdir iterator.
+ *
+ * glibc's implementation of readdir() on Linux can end up reading the entire
+ * directory into memory. This can lead to a problem with very large
+ * directories with millions of files in them. Instead of using readdir(), this
+ * uses the underlying system call that glibc uses, getdents(), which does not
+ * have this problem.
+ */
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/types.h>

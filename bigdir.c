@@ -1,5 +1,21 @@
 #include <Python.h>
 
+/**
+ * Platform-specific bigdir_iterator implementations. They are expected to
+ * provide the following structure:
+ *
+ *     struct bigdir_iterator {
+ *         char bd_eof;   // True if EOF is reached
+ *         char *bd_name; // Relative path of current directory entry.
+ *     };
+ *
+ * and the following functions for opening, closing, and advancing the
+ * iterator:
+ *
+ *     int bigdir_iterator_open(struct bigdir_iterator*, const char*);
+ *     void bigdir_iterator_dealloc(struct bigdir_iterator*);
+ *     int bigdir_iterator_next(struct bigdir_iterator*);
+ */
 #ifdef __linux__
 #include "platform_linux.c"
 #elif defined(__APPLE__) || defined(unix) || defined(__unix__) || defined(__unix)
@@ -63,9 +79,9 @@ static PyTypeObject bigdir_PyIteratorType = {
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
     "bigdir._Iterator",        /*tp_name*/
-    sizeof(bigdir_PyIterator),   /*tp_basicsize*/
+    sizeof(bigdir_PyIterator), /*tp_basicsize*/
     0,                         /*tp_itemsize*/
-    bigdir_PyIterator_dealloc,   /*tp_dealloc*/
+    bigdir_PyIterator_dealloc, /*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
     0,                         /*tp_setattr*/

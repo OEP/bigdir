@@ -1,3 +1,9 @@
+/**
+ * Unix bigdir iterator.
+ *
+ * This uses the standard Unix interfaces to implement the bigdir iterator.
+ * There are no special optimizations.
+ */
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
