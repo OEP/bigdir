@@ -1,4 +1,7 @@
 language: python
+os:
+    - linux
+    - osx
 env:
     - TOX_ENV=py27
     # TODO - TOX_ENV=py34
