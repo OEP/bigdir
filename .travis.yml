@@ -6,7 +6,7 @@ env:
     - TOX_ENV=py27
     # TODO - TOX_ENV=py34
     # TODO if ok on travis - TOX_ENV=benchmark
-install:
+before_install:
     - pip install tox
 script:
     - tox -e $TOX_ENV -- --verbose
