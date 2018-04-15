@@ -1,5 +1,18 @@
 #include <Python.h>
 
+#define MOD_NAME "bigdir"
+
+/* Python 2 and 3 compatibility cruft. */
+#if PY_MAJOR_VERSION >= 3
+#define BIGDIR_TPFLAGS (Py_TPFLAGS_DEFAULT)
+#define INIT_ERROR return NULL
+#define MOD_INIT(name) PyMODINIT_FUNC PyInit_##name(void)
+#else
+#define BIGDIR_TPFLAGS (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER)
+#define INIT_ERROR return
+#define MOD_INIT(name) PyMODINIT_FUNC init##name(void)
+#endif
+
 /**
  * Platform-specific bigdir_iterator implementations. They are expected to
  * provide the following structure:
@@ -24,39 +37,38 @@
 #error Unsupported platform
 #endif
 
-const char* bigdir_doc =
-    "Read very large directories easily\n"
+#define BIGDIR_DOC \
+    "Read very large directories easily\n" \
+    "\n" \
+    "bigdir is a drop in replacement for os.listdir() which handles large\n" \
+    "directories more gracefully. It differs from scandir() in that it does\n" \
+    "not return file attribute information and can be fast for very large\n" \
+    "directories on Linux systems which rely on glibc's readdir()\n" \
+    "implementation.\n" \
+    "\n" \
+    "Synopsis\n" \
+    "--------\n" \
+    "\n" \
+    "Use bigdir.scan() in place of os.listdir() on directories which may be\n" \
+    "very large:\n" \
+    "\n" \
+    "    import bigdir\n" \
+    "    for path in bigdir.scan('/tmp'):\n" \
+    "        print(path)\n" \
+    "\n" \
+    "Use bigdir.IMPLEMENTATION to determine which implementation of bigdir you\n" \
+    "are using. It is either \"linux\" or \"unix\". The \"linux\" implementation\n" \
+    "avoids calling readdir(), opting for the lower-level getdents() system call\n" \
+    "which is will not buffer the entire directory into memory before returning\n" \
+    "the first result. This usually means more responsive scripts when the\n" \
+    "number of files are in the millions. The \"unix\" implementation does not\n" \
+    "provide any special benefit, and is only present so you can write somewhat\n" \
+    "portable scripts with bigdir:\n" \
+    "\n" \
+    "    >>> import bigdir\n" \
+    "    >>> bigdir.IMPLEMENTATION\n" \
+    "    \"linux\"\n" \
     "\n"
-    "bigdir is a drop in replacement for os.listdir() which handles large\n"
-    "directories more gracefully. It differs from scandir() in that it does\n"
-    "not return file attribute information and can be fast for very large\n"
-    "directories on Linux systems which rely on glibc's readdir()\n"
-    "implementation.\n"
-    "\n"
-    "Synopsis\n"
-    "--------\n"
-    "\n"
-    "Use bigdir.scan() in place of os.listdir() on directories which may be\n"
-    "very large:\n"
-    "\n"
-    "    import bigdir\n"
-    "    for path in bigdir.scan('/tmp'):\n"
-    "        print(path)\n"
-    "\n"
-    "Use bigdir.IMPLEMENTATION to determine which implementation of bigdir you\n"
-    "are using. It is either \"linux\" or \"unix\". The \"linux\" implementation\n"
-    "avoids calling readdir(), opting for the lower-level getdents() system call\n"
-    "which is will not buffer the entire directory into memory before returning\n"
-    "the first result. This usually means more responsive scripts when the\n"
-    "number of files are in the millions. The \"unix\" implementation does not\n"
-    "provide any special benefit, and is only present so you can write somewhat\n"
-    "portable scripts with bigdir:\n"
-    "\n"
-    "    >>> import bigdir\n"
-    "    >>> bigdir.IMPLEMENTATION\n"
-    "    \"linux\"\n"
-    "\n"
-;
 
 
 typedef struct {
@@ -83,7 +95,7 @@ bigdir_PyIterator_next(PyObject *self)
 {
     bigdir_PyIterator *p = (bigdir_PyIterator*)self;
 
-    /* Check that we didn't start on en EOF */
+    /* Check that we didn't start on an EOF */
     if (p->it.bd_eof) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
@@ -101,19 +113,18 @@ bigdir_PyIterator_next(PyObject *self)
          !strncmp(p->it.bd_name, "..", 2))
     );
 
-    /* Check that we didn't end on en EOF */
+    /* Check that we didn't end on an EOF */
     if (p->it.bd_eof) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
 
-    return PyString_FromString(p->it.bd_name);
+    return PyUnicode_FromString(p->it.bd_name);
 }
 
 static PyTypeObject bigdir_PyIteratorType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
-    "bigdir._Iterator",        /*tp_name*/
+    PyVarObject_HEAD_INIT(NULL, 0)
+    MOD_NAME "._Iterator",     /*tp_name*/
     sizeof(bigdir_PyIterator), /*tp_basicsize*/
     0,                         /*tp_itemsize*/
     bigdir_PyIterator_dealloc, /*tp_dealloc*/
@@ -131,7 +142,7 @@ static PyTypeObject bigdir_PyIteratorType = {
     0,                         /*tp_getattro*/
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,
+    BIGDIR_TPFLAGS,
       /* tp_flags: Py_TPFLAGS_HAVE_ITER tells python to
          use tp_iter and tp_iternext fields. */
     "Internal iterator object",           /* tp_doc */
@@ -173,11 +184,39 @@ static PyMethodDef bigdir_methods[] = {
     {NULL, NULL, 0, NULL},
 };
 
-PyMODINIT_FUNC
-initbigdir(void)
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        MOD_NAME,
+        BIGDIR_DOC,
+        -1,
+        bigdir_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+};
+#endif
+
+MOD_INIT(bigdir)
 {
-    PyObject* module = Py_InitModule3("bigdir", bigdir_methods, bigdir_doc);
-    (void)PyObject_SetAttr(module,
-        PyString_FromString("IMPLEMENTATION"),
-        PyString_FromString(BIGDIR_IMPLEMENTATION));
+#if PY_MAJOR_VERSION >= 3
+    PyObject *module = PyModule_Create(&moduledef);
+#else
+    PyObject *module = Py_InitModule3(MOD_NAME, bigdir_methods, BIGDIR_DOC);
+#endif
+    if (module == NULL) {
+        INIT_ERROR;
+    }
+
+    // Export bigdir.IMPLEMENTATION
+    if(PyObject_SetAttr(module,
+            PyUnicode_FromString("IMPLEMENTATION"),
+            PyUnicode_FromString(BIGDIR_IMPLEMENTATION)) != 0) {
+        Py_DECREF(module);
+        INIT_ERROR;
+    }
+#if PY_MAJOR_VERSION >= 3
+    return module;
+#endif
 }
