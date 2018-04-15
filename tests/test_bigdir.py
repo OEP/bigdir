@@ -1,6 +1,7 @@
 import bigdir
 import errno
 import pytest
+import six
 import sys
 
 
@@ -63,3 +64,26 @@ def test_implementation_linux():
 
 def test_doc():
     assert bigdir.__doc__
+
+
+def test_unicode1(tmpdir):
+    # Technical note: path1 and path2 are both legal ways of representing the
+    # same perceptual data. If you read the data off of HFS it makes this
+    # conversion. Kind of strange...
+    path1 = u'\u0108.txt'
+    path2 = u'C\u0302.txt'
+    tmpdir.join(path1).ensure()
+    result = list(bigdir.scan(str(tmpdir)))
+    assert len(result) == 1
+    assert result[0] in (path1, path2)
+
+
+@pytest.mark.xfail(six.PY2,
+                   reason='ParseTuple unicode arguments not implemented')
+def test_unicode2(tmpdir):
+    root = tmpdir.join(u'\u0108')
+    root.mkdir()
+    root.join('foo.txt').ensure()
+    arg = six.text_type(root)
+    result = list(bigdir.scan(arg))
+    assert result == ['foo.txt']

@@ -160,6 +160,7 @@ bigdir_scan(PyObject *self, PyObject *args)
     const char *path;
     bigdir_PyIterator *p;
 
+    // TODO Make this work better for Unicode paths on Python 2.
     if (!PyArg_ParseTuple(args, "s", &path)) {
         return NULL;
     }
