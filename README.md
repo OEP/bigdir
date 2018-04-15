@@ -43,9 +43,6 @@ smaller priority since they do not seem to have the same problem.
 Implementations for other platforms are mainly to provide the same interface
 without aiming to increase the performance in any way.
 
-Python 2 is currently what is tested, but Python 3 support is probably a couple
-of lines of code away.
-
 Testing
 -------
 
