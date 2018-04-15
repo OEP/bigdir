@@ -4,7 +4,7 @@ os:
     # TODO - osx
 env:
     - TOX_ENV=py27
-    # TODO - TOX_ENV=py34
+    - TOX_ENV=py34
     # TODO if ok on travis - TOX_ENV=benchmark
 before_install:
     - pip install tox
