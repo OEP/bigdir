@@ -4,7 +4,7 @@ import pytest
 import sys
 
 
-USE_LINUX = sys.platform == 'linux2'
+USE_LINUX = sys.platform in ('linux2', 'linux')
 USE_UNIX = not USE_LINUX
 
 
