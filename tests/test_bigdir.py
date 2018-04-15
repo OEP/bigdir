@@ -1,5 +1,6 @@
 import bigdir
 import errno
+import os
 import pytest
 import six
 import sys
@@ -85,3 +86,14 @@ def test_unicode2(tmpdir):
     arg = six.text_type(root)
     result = list(bigdir.scan(arg))
     assert result == ['foo.txt']
+
+
+def test_remove_files(tmpdir):
+    files = set(['apple', 'banana', 'carrot'])
+    for filename in files:
+        tmpdir.join(filename).ensure()
+    for filename in bigdir.scan(str(tmpdir)):
+        assert filename in files
+        os.remove(os.path.join(str(tmpdir), filename))
+        files.remove(filename)
+    assert files == set()
