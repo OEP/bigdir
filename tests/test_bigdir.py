@@ -78,8 +78,6 @@ def test_unicode1(tmpdir):
     assert result[0] in (path1, path2)
 
 
-@pytest.mark.xfail(six.PY2,
-                   reason='ParseTuple unicode arguments not implemented')
 def test_unicode2(tmpdir):
     root = tmpdir.join(u'\u0108')
     root.mkdir()

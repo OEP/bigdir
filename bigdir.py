@@ -12,8 +12,8 @@ Use bigdir.scan() in place of os.listdir() on directories which may be very
 large:
 
     import bigdir
-    for path in bigdir.scan('/tmp'):
-        print(path)
+    for filename in bigdir.scan('/tmp'):
+        print(filename)
 
 Use bigdir.IMPLEMENTATION to determine which implementation of bigdir you are
 using. It is either "linux" or "unix". The "linux" implementation avoids
@@ -30,7 +30,26 @@ bigdir:
 
 """
 
+import sys
 import _bigdir
 
-scan = _bigdir.scan
 IMPLEMENTATION = _bigdir.IMPLEMENTATION
+
+
+def scan(path):
+    """Scan a directory for its contents.
+
+    Returns an iterator which yields the filenames contained within the
+    directory. You should use os.path.join() to construct absolute paths to the
+    file. For example, this loop removes files in the directory:
+
+    >>> import bigdir
+    >>> for filename in bigdir.scan(path):
+    ...     os.remove(os.path.join(path, filename))
+
+    """
+    # The PyArg_ParseTuple methods aren't very tolerant of unicode characters
+    # in Python 2.7, so this is just a quick fix so those paths will work.
+    if sys.version_info[0] < 3:
+        path = path.encode('utf-8')
+    return _bigdir.scan(path)
