@@ -30,6 +30,33 @@ This extension is based on the idea from
 [lowmem-tools](https://github.com/ScottDuckworth/lowmem-tools) which provides
 alternative implementations of `rm` and `ls` Unix commands.
 
+When to use
+-----------
+
+Probably, you don't need to use bigdir, and should use
+[scandir](https://github.com/benhoyt/scandir) instead.
+
+bigdir is meant for the pathological case where a misbehaving program has
+written millions of files to a flat directory and you're probably only
+interested in cleaning up the mess. It turns out scandir does pretty well in
+this case. Here is the timing I get on a million-file directory after dropping
+the file system cache (`echo 3 > /proc/sys/vm/drop_caches`).
+
+Benchmark Name | Time (sec)
+-------------- | ----------
+`listdir_all`  | 30.2
+`listdir_1`    | 32.4
+`bigdir_all`   | 27.4
+`bigdir_1`     | 2.58
+`bigdir_0`     | 0.0371
+`scandir_all`  | 32.1
+`scandir_1`    | 0.0472
+`scandir_0`    | 0.00155
+
+There is a small difference between reading the entire directory between bigdir
+and scandir, but it is probably because scandir returns file attribute
+information as well.
+
 Support
 -------
 
