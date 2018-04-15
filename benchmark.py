@@ -35,6 +35,16 @@ def generate_fixture(path, count):
             open(os.path.join(path, uuid.uuid1().hex), 'w').close()
 
 
+def drop_fs_cache():
+    try:
+        with open('/proc/sys/vm/drop_caches', 'w') as fp:
+            fp.write('3\n')
+    except IOError as e:
+        click.secho('Could not drop FS cache; times may be unreliable',
+                    fg='yellow', bold=True)
+        click.secho('Exception: {}'.format(e), fg='yellow', bold=True)
+
+
 all_benchmarks = []
 
 
@@ -116,10 +126,11 @@ def main(path, count):
         if b.skip:
             click.secho("skipped", bold=True)
         else:
+            drop_fs_cache()
             t0 = time.time()
             b.fn(path)
             t1 = time.time()
-            click.secho("{} sec".format(t1 - t0), bold=True)
+            click.secho("{:3f} sec".format(t1 - t0), bold=True)
 
 
 if __name__ == '__main__':
