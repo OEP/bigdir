@@ -1,6 +1,7 @@
 #include <Python.h>
 
-#define MOD_NAME "bigdir"
+#define MOD_NAME "_bigdir"
+#define BIGDIR_DOC "Internal C extension for bigdir"
 
 /* Python 2 and 3 compatibility cruft. */
 #if PY_MAJOR_VERSION >= 3
@@ -36,39 +37,6 @@
 #else
 #error Unsupported platform
 #endif
-
-#define BIGDIR_DOC \
-    "Read very large directories easily\n" \
-    "\n" \
-    "bigdir is a drop in replacement for os.listdir() which handles large\n" \
-    "directories more gracefully. It differs from scandir() in that it does\n" \
-    "not return file attribute information and can be fast for very large\n" \
-    "directories on Linux systems which rely on glibc's readdir()\n" \
-    "implementation.\n" \
-    "\n" \
-    "Synopsis\n" \
-    "--------\n" \
-    "\n" \
-    "Use bigdir.scan() in place of os.listdir() on directories which may be\n" \
-    "very large:\n" \
-    "\n" \
-    "    import bigdir\n" \
-    "    for path in bigdir.scan('/tmp'):\n" \
-    "        print(path)\n" \
-    "\n" \
-    "Use bigdir.IMPLEMENTATION to determine which implementation of bigdir you\n" \
-    "are using. It is either \"linux\" or \"unix\". The \"linux\" implementation\n" \
-    "avoids calling readdir(), opting for the lower-level getdents() system call\n" \
-    "which is will not buffer the entire directory into memory before returning\n" \
-    "the first result. This usually means more responsive scripts when the\n" \
-    "number of files are in the millions. The \"unix\" implementation does not\n" \
-    "provide any special benefit, and is only present so you can write somewhat\n" \
-    "portable scripts with bigdir:\n" \
-    "\n" \
-    "    >>> import bigdir\n" \
-    "    >>> bigdir.IMPLEMENTATION\n" \
-    "    \"linux\"\n" \
-    "\n"
 
 
 typedef struct {
@@ -199,7 +167,7 @@ static struct PyModuleDef moduledef = {
 };
 #endif
 
-MOD_INIT(bigdir)
+MOD_INIT(_bigdir)
 {
 #if PY_MAJOR_VERSION >= 3
     PyObject *module = PyModule_Create(&moduledef);
